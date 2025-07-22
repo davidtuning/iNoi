@@ -3,7 +3,6 @@ package fs
 import (
 	"context"
 	"fmt"
-	"net/http"
 	stdpath "path"
 	"time"
 
@@ -86,26 +85,24 @@ func _copy(ctx context.Context, srcObjPath, dstDirPath string, lazyCache ...bool
 		}
 		if !srcObj.IsDir() {
 			// copy file directly
-			link, _, err := op.Link(ctx, srcStorage, srcObjActualPath, model.LinkArgs{
-				Header: http.Header{},
-			})
+			link, _, err := op.Link(ctx, srcStorage, srcObjActualPath, model.LinkArgs{})
 			if err != nil {
 				return nil, errors.WithMessagef(err, "链接获取失败: [%s]", srcObjPath)
 			}
-			fs := stream.FileStream{
+			// any link provided is seekable
+			ss, err := stream.NewSeekableStream(&stream.FileStream{
 				Obj: srcObj,
 				Ctx: ctx,
-			}
-			// any link provided is seekable
-			ss, err := stream.NewSeekableStream(fs, link)
+			}, link)
 			if err != nil {
+				_ = link.Close()
 				return nil, errors.WithMessagef(err, "流媒体获取失败: [%s]", srcObjPath)
 			}
 			return nil, op.Put(ctx, dstStorage, dstDirActualPath, ss, nil, false)
 		}
 	}
 	// not in the same storage
-	taskCreator, _ := ctx.Value("user").(*model.User)
+	taskCreator, _ := ctx.Value(conf.UserKey).(*model.User)
 	t := &CopyTask{
 		TaskExtension: task.TaskExtension{
 			Creator: taskCreator,
@@ -164,21 +161,19 @@ func copyFileBetween2Storages(tsk *CopyTask, srcStorage, dstStorage driver.Drive
 	if err != nil {
 		return errors.WithMessagef(err, "源文件获取失败: [%s]", srcFilePath)
 	}
-	tsk.SetTotalBytes(srcFile.GetSize())
-	link, _, err := op.Link(tsk.Ctx(), srcStorage, srcFilePath, model.LinkArgs{
-		Header: http.Header{},
-	})
+	link, _, err := op.Link(tsk.Ctx(), srcStorage, srcFilePath, model.LinkArgs{})
 	if err != nil {
 		return errors.WithMessagef(err, "链接获取失败: [%s]", srcFilePath)
 	}
-	fs := stream.FileStream{ 
+	// any link provided is seekable
+	ss, err := stream.NewSeekableStream(&stream.FileStream{
 		Obj: srcFile,
 		Ctx: tsk.Ctx(),
-	}
-	// any link provided is seekable
-	ss, err := stream.NewSeekableStream(fs, link)
+	}, link)
 	if err != nil {
+		_ = link.Close()
 		return errors.WithMessagef(err, "流媒体获取失败: [%s]", srcFilePath)
 	}
+	tsk.SetTotalBytes(ss.GetSize())
 	return op.Put(tsk.Ctx(), dstStorage, dstDirPath, ss, tsk.SetProgress, true)
 }

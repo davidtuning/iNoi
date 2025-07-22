@@ -5,13 +5,10 @@ on:
     types: [ published ]
 
 jobs:
-  release:
-    strategy:
-      matrix:
-        platform: [ ubuntu-latest ]
-        go-version: [ '1.21' ]
-    name: Release
-    runs-on: ${{ matrix.platform }}
+  # Set release to prerelease first
+  prerelease:
+    name: Set Prerelease
+    runs-on: ubuntu-latest
     steps:
 
       - name: Free Disk Space (Ubuntu)
