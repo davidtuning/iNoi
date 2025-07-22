@@ -25,7 +25,7 @@ jobs:
       - name: Prerelease
         uses: irongut/EditRelease@v1.2.0
         with:
-          token: ${{ secrets.MY_TOKEN }}
+          token: ${{ github_token }}
           id: ${{ github.event.release.id }}
           prerelease: true
 
@@ -50,7 +50,7 @@ jobs:
         run: |
           bash build.sh release
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ github_token }}
 
       - name: Upload assets
         uses: softprops/action-gh-release@v2
